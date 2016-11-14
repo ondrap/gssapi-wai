@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/ondrap/haskell-gssapi.svg?branch=master)](https://travis-ci.org/ondrap/haskell-gssapi) [![Hackage](https://img.shields.io/hackage/v/haskell-gssapi.svg)](https://hackage.haskell.org/package/haskell-gssapi)
+[![Build Status](https://travis-ci.org/ondrap/gssapi-wai.svg?branch=master)](https://travis-ci.org/ondrap/gssapi-wai) [![Hackage](https://img.shields.io/hackage/v/gssapi-wai.svg)](https://hackage.haskell.org/package/gssapi-wai)
 
 ## GSSAPI and Kerberos bindings for Haskell
 
