@@ -5,6 +5,10 @@
 See haskell [gssapi](http://github.com/ondrap/gssapi) package
 for tutorial how to set up kerberos authentication with Windows AD.
 
+This module is modelled after [spnego-http-auth-nginx-module](https://github.com/stnoonan/spnego-http-auth-nginx-module).
+If you are using it to provide auth, it should be reasonably easy to use this module instead.
+
+
 #### The application
 
 Generally you need to use TLS, otherwise browsers refuse to use SPNEGO authentication.

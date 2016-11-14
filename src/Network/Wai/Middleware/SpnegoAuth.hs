@@ -53,6 +53,7 @@ data SpnegoAuthSettings = SpnegoAuthSettings {
   , spnegoOnAuthError   :: SpnegoAuthSettings -> Maybe (Either KrbException GssException) -> Application
     -- ^ Called upon GSSAPI/Kerberos error. It is supposed to return 401 return code with
     --   'Authorize: Negotiate' and possibly 'Authorize: Basic realm=...' headers
+  , spnegoFakeBasicAuth :: Bool -- ^ Fake 'Authorization: ' basic header for applications relying on Basic auth
 }
 
 -- | Default settings for `spnegoAuth` middleware
@@ -64,6 +65,7 @@ defaultSpnegoSettings = SpnegoAuthSettings {
   , spnegoBasicFailback = True
   , spnegoForceRealm = True
   , spnegoOnAuthError = authError
+  , spnegoFakeBasicAuth = False
   }
   where
     authHeaders SpnegoAuthSettings{spnegoBasicFailback=True, spnegoRealm=Just realm} =
@@ -99,9 +101,15 @@ spnegoAuth settings@SpnegoAuthSettings{..} iapp req respond = do
               runKerberosCheck user password `catch` (\exc -> spnegoOnAuthError settings (Just (Left exc)) req respond)
       _ -> spnegoOnAuthError settings Nothing req respond
     where
-      insertUserToVault myreq user = myreq{vault = vault'}
+      insertUserToVault user myreq  = myreq{vault = vault'}
           where
             vault' = V.insert spnegoAuthKey (stripSpnegoRealm user) (vault myreq)
+      fakeAuth user myreq
+        | spnegoFakeBasicAuth =
+            let oldHeaders = requestHeaders myreq
+                fakeHeader = (hAuthorization, "Basic " <> B64.encode (user <> ":password"))
+            in myreq{requestHeaders=fakeHeader : oldHeaders}
+        | otherwise = myreq
 
       modifyKrbUser orig_user
         | spnegoForceRealm = user <> fromMaybe "" (("@" <>) <$> spnegoRealm)
@@ -113,15 +121,15 @@ spnegoAuth settings@SpnegoAuthSettings{..} iapp req respond = do
       runKerberosCheck origuser password = do
           user <- krb5Resolve (modifyKrbUser origuser)
           krb5Login user password -- throws exception in case of error
-          iapp (insertUserToVault req user) respond
+          iapp (insertUserToVault user req) respond
 
       runSpnegoCheck token = do
           let service
-                | Just svc <- spnegoService, '@' `BS.elem` svc = spnegoService
+                | (BS.elem '@' <$> spnegoService) == Just True = spnegoService
                 | otherwise = (<> fromMaybe "" (("@" <>) <$> spnegoRealm)) <$> spnegoService
           (user, output) <- runGssCheck service token
           let neghdr = (hWWWAuthenticate, "Negotiate " <> B64.encode output)
-          iapp (insertUserToVault req user) (respond . mapResponseHeaders (neghdr :))
+          iapp (fakeAuth user $ insertUserToVault user req) (respond . mapResponseHeaders (neghdr :))
 
       -- Strip Realm, if spnegoUserFull is not set and the realm equals to spnegoRealm
       stripSpnegoRealm user
