@@ -2,7 +2,7 @@
 
 ## GSSAPI and Kerberos bindings for Haskell
 
-See [haskell-gssapi](http://github.com/ondrap/haskell-gssapi)
+See haskell [gssapi](http://github.com/ondrap/gssapi) package
 for tutorial how to set up kerberos authentication with Windows AD.
 
 #### The application
