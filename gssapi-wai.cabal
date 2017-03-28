@@ -1,5 +1,5 @@
 name:                gssapi-wai
-version:             0.1.0.0
+version:             0.1.0.1
 synopsis:            WAI Middleware for SPNEGO authentiaction
 description:         Basic WAI Middleware allows both SPNEGO and failback to Kerberos
                      username/password authentication.

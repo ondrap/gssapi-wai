@@ -107,7 +107,7 @@ spnegoAuth settings@SpnegoAuthSettings{..} iapp req respond = do
       fakeAuth user myreq
         | spnegoFakeBasicAuth =
             let oldHeaders = requestHeaders myreq
-                fakeHeader = (hAuthorization, "Basic " <> B64.encode (user <> ":password"))
+                fakeHeader = (hAuthorization, "Basic " <> B64.encode (stripSpnegoRealm user <> ":password"))
             in myreq{requestHeaders=fakeHeader : oldHeaders}
         | otherwise = myreq
 
