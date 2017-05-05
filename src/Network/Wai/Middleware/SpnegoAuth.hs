@@ -33,8 +33,10 @@ import           Network.HTTP.Types.Header       (hAuthorization,
 import           Network.Wai                     (Application, Middleware,
                                                   Request (..),
                                                   mapResponseHeaders,
-                                                  responseLBS)
+                                                  responseLBS, ResponseReceived,
+                                                  Response)
 import           Network.Wai.Middleware.HttpAuth (extractBasicAuth)
+import           System.IO                       (hPutStrLn, stderr)
 import           System.IO.Unsafe
 
 import           Network.Security.GssApi
@@ -64,9 +66,13 @@ defaultSpnegoSettings = SpnegoAuthSettings {
   , spnegoUserFull = False
   , spnegoBasicFailback = True
   , spnegoForceRealm = True
-  , spnegoOnAuthError = authError
+  , spnegoOnAuthError = defaultAuthError (hPutStrLn stderr)
   , spnegoFakeBasicAuth = False
   }
+
+-- | Genereate HTTP response that asks client to do appropriate authentication
+defaultAuthResponse :: SpnegoAuthSettings -> (Response -> IO ResponseReceived) -> IO ResponseReceived
+defaultAuthResponse settings respond = respond $ responseLBS status401 (authHeaders settings) "Unauthorized"
   where
     authHeaders SpnegoAuthSettings{spnegoBasicFailback=True, spnegoRealm=Just realm} =
         [(hWWWAuthenticate, "Negotiate"), (hWWWAuthenticate, "Basic realm=\"" <> realm <> "\"")]
@@ -74,15 +80,15 @@ defaultSpnegoSettings = SpnegoAuthSettings {
         [(hWWWAuthenticate, "Negotiate"), (hWWWAuthenticate, "Basic realm=\"Auth\"")]
     authHeaders SpnegoAuthSettings{spnegoBasicFailback=False} = [(hWWWAuthenticate, "Negotiate")]
 
-    baseResponse settings respond = respond $ responseLBS status401 (authHeaders settings) "Unauthorized"
-
-    authError settings Nothing _ respond = baseResponse settings respond
-    authError settings (Just (Left (KrbException _ err))) _ respond = do
-        putStrLn $ "Kerberos error: " <> show err
-        baseResponse settings respond
-    authError settings (Just (Right (GssException _ err))) _ respond = do
-        putStrLn $ "GSSAPI error: " <> show err
-        baseResponse settings respond
+-- | Default authentication for filling in spnegoOnAuthError
+defaultAuthError :: (String -> IO ()) -> SpnegoAuthSettings -> Maybe (Either KrbException GssException) -> Application
+defaultAuthError _ settings Nothing _ respond = defaultAuthResponse settings respond
+defaultAuthError logerr settings (Just (Left (KrbException code err))) _ respond = do
+    logerr $ "Kerberos error code: " <> show code <> ", error: " <> show err
+    defaultAuthResponse settings respond
+defaultAuthError logerr settings (Just (Right (GssException code err))) _ respond = do
+    logerr $ "GSSAPI error code: " <> show code <> ", error: " <> show err
+    defaultAuthResponse settings respond
 
 -- | Key that is used to access the username in WAI vault
 spnegoAuthKey :: V.Key BS.ByteString
