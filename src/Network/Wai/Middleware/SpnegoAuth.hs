@@ -17,6 +17,8 @@ module Network.Wai.Middleware.SpnegoAuth (
   , SpnegoAuthSettings(..)
   , defaultSpnegoSettings
   , spnegoAuthKey
+  , defaultAuthResponse
+  , defaultAuthError
 ) where
 
 import           Control.Arrow                   (second)
