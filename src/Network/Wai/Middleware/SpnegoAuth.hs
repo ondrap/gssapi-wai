@@ -88,8 +88,9 @@ defaultAuthError _ settings Nothing _ respond = defaultAuthResponse settings res
 defaultAuthError logerr settings (Just (Left (KrbException code err))) _ respond = do
     logerr $ "Kerberos error code: " <> show code <> ", error: " <> show err
     defaultAuthResponse settings respond
-defaultAuthError logerr settings (Just (Right (GssException code err))) _ respond = do
-    logerr $ "GSSAPI error code: " <> show code <> ", error: " <> show err
+defaultAuthError logerr settings (Just (Right (GssException major majorTxt minor minorTxt))) _ respond = do
+    logerr $ "GSSAPI major code: " <> show major <> ", error: " <> show majorTxt
+               <> ", minor code: " <> show minor <> ", error: " <> show minorTxt
     defaultAuthResponse settings respond
 
 -- | Key that is used to access the username in WAI vault
