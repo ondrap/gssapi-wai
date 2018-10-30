@@ -12,7 +12,7 @@ homepage:            https://github.com/ondrap/gssapi-wai
 copyright:           Ondrej Palkovsky
 category:            Network
 build-type:          Simple
-extra-source-files:  examples/Main.hs examples/stack.yaml examples/haskell-gssapi-test.cabal README.md
+extra-source-files:  examples/Main.hs examples/stack.yaml examples/haskell-gssapi-test.cabal README.md ChangeLog.md
 cabal-version:       >=1.10
 
 source-repository head
