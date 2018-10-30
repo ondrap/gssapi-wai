@@ -57,6 +57,8 @@ data SpnegoAuthSettings = SpnegoAuthSettings {
   , spnegoOnAuthError   :: SpnegoAuthSettings -> Maybe (Either KrbException GssException) -> Application
     -- ^ Called upon GSSAPI/Kerberos error. It is supposed to return 401 return code with
     --   'Authorize: Negotiate' and possibly 'Authorize: Basic realm=...' headers
+    --
+    -- You MUST flush the request body in this method, otherwise POST/PUT/etc. requests mysteriously fail.
   , spnegoFakeBasicAuth :: Bool -- ^ Fake 'Authorization: ' basic header for applications relying on Basic auth
 }
 
@@ -73,8 +75,10 @@ defaultSpnegoSettings = SpnegoAuthSettings {
   }
 
 -- | Genereate HTTP response that asks client to do appropriate authentication
-defaultAuthResponse :: SpnegoAuthSettings -> (Response -> IO ResponseReceived) -> IO ResponseReceived
-defaultAuthResponse settings respond = respond $ responseLBS status401 (authHeaders settings) "Unauthorized"
+defaultAuthResponse :: SpnegoAuthSettings -> Request -> (Response -> IO ResponseReceived) -> IO ResponseReceived
+defaultAuthResponse settings request respond = do
+    flushRequestBody request
+    respond $ responseLBS status401 (authHeaders settings) "Unauthorized"
   where
     authHeaders SpnegoAuthSettings{spnegoBasicFailback=True, spnegoRealm=Just realm} =
         [(hWWWAuthenticate, "Negotiate"), (hWWWAuthenticate, "Basic realm=\"" <> realm <> "\"")]
@@ -82,16 +86,23 @@ defaultAuthResponse settings respond = respond $ responseLBS status401 (authHead
         [(hWWWAuthenticate, "Negotiate"), (hWWWAuthenticate, "Basic realm=\"Auth\"")]
     authHeaders SpnegoAuthSettings{spnegoBasicFailback=False} = [(hWWWAuthenticate, "Negotiate")]
 
+flushRequestBody :: Request -> IO ()
+flushRequestBody req = do
+    res <- requestBody req
+    case res of
+        "" -> return ()
+        _ -> flushRequestBody req
+
 -- | Default authentication for filling in spnegoOnAuthError
 defaultAuthError :: (String -> IO ()) -> SpnegoAuthSettings -> Maybe (Either KrbException GssException) -> Application
-defaultAuthError _ settings Nothing _ respond = defaultAuthResponse settings respond
-defaultAuthError logerr settings (Just (Left (KrbException code err))) _ respond = do
+defaultAuthError _ settings Nothing req respond = defaultAuthResponse settings req respond
+defaultAuthError logerr settings (Just (Left (KrbException code err))) req respond = do
     logerr $ "Kerberos error code: " <> show code <> ", error: " <> show err
-    defaultAuthResponse settings respond
-defaultAuthError logerr settings (Just (Right (GssException major majorTxt minor minorTxt))) _ respond = do
+    defaultAuthResponse settings req respond
+defaultAuthError logerr settings (Just (Right (GssException major majorTxt minor minorTxt))) req respond = do
     logerr $ "GSSAPI major code: " <> show major <> ", error: " <> show majorTxt
                <> ", minor code: " <> show minor <> ", error: " <> show minorTxt
-    defaultAuthResponse settings respond
+    defaultAuthResponse settings req respond
 
 -- | Key that is used to access the username in WAI vault
 spnegoAuthKey :: V.Key BS.ByteString
